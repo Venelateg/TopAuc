@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TopAuc - Аукционы на блокчейне TON</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Добавление TonConnect SDK -->
+    <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>TopAuc</h1>
+            <p>Аукционная платформа на блокчейне TON</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <section id="auth-section">
+            <h2>Подключение кошелька</h2>
+            <p>Для участия в аукционах необходимо подключить TON кошелек.</p>
+            <div id="connect-wallet-btn" class="btn">Подключить кошелек</div>
+            <div id="wallet-info" style="display: none;">
+                <p>Ваш адрес кошелька: <span id="wallet-address"></span></p>
+                <div id="disconnect-wallet-btn" class="btn">Отключить кошелек</div>
+            </div>
+        </section>
+
+        <section id="telegram-bot-section">
+            <h2>Телеграм-бот TopAuc</h2>
+            <p>Для полноценного участия в аукционах используйте нашего Telegram-бота:</p>
+            <a href="https://t.me/TopAucBot" target="_blank" class="btn">Открыть бота</a>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 TopAuc - Аукционы на блокчейне TON</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Инициализация TonConnect
+            const connector = new TonConnectSDK.TonConnect({
+                manifestUrl: 'https://yourusername.github.io/TopAuc/tonconnect-manifest.json'
+            });
+
+            // Функция для обновления интерфейса
+            function updateUI() {
+                const walletInfo = document.getElementById('wallet-info');
+                const walletAddress = document.getElementById('wallet-address');
+                const connectBtn = document.getElementById('connect-wallet-btn');
+                
+                if (connector.connected) {
+                    walletInfo.style.display = 'block';
+                    connectBtn.style.display = 'none';
+                    walletAddress.textContent = connector.account?.address || 'Адрес не получен';
+                    
+                    // Отправка данных в Telegram бота, если есть параметр tgWebAppData
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const tgWebAppData = urlParams.get('tgWebAppData');
+                    
+                    if (tgWebAppData && window.Telegram && window.Telegram.WebApp) {
+                        window.Telegram.WebApp.sendData(JSON.stringify({
+                            walletAddress: connector.account?.address
+                        }));
+                    }
+                } else {
+                    walletInfo.style.display = 'none';
+                    connectBtn.style.display = 'block';
+                }
+            }
+
+            // Проверка состояния подключения
+            connector.onStatusChange(updateUI);
+            await connector.restoreConnection();
+            updateUI();
+
+            // Обработчики кнопок
+            document.getElementById('connect-wallet-btn').addEventListener('click', async () => {
+                try {
+                    const wallets = await connector.getWallets();
+                    
+                    // Выбираем Tonkeeper по умолчанию или первый доступный кошелек
+                    const defaultWallet = wallets.find(w => w.name === 'Tonkeeper') || wallets[0];
+                    
+                    if (defaultWallet) {
+                        const universalLink = connector.connect({
+                            universalLink: defaultWallet.universalLink,
+                            bridgeUrl: defaultWallet.bridgeUrl
+                        });
+                        
+                        window.open(universalLink, '_blank');
+                    } else {
+                        alert('Не найдены поддерживаемые кошельки TON');
+                    }
+                } catch (error) {
+                    console.error('Ошибка при подключении кошелька:', error);
+                    alert('Произошла ошибка при подключении кошелька');
+                }
+            });
+
+            document.getElementById('disconnect-wallet-btn').addEventListener('click', async () => {
+                try {
+                    await connector.disconnect();
+                    updateUI();
+                } catch (error) {
+                    console.error('Ошибка при отключении кошелька:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
